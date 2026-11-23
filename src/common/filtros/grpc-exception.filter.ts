@@ -37,7 +37,6 @@ export class GrpcExceptionFilter implements ExceptionFilter {
       return exception.getError() as ErrorGrpc;
     }
 
-
     this.logger.error('Error inesperado', exception as Error);
     return { code: status.INTERNAL, message: 'Error interno del servidor' };
   }
@@ -46,7 +45,8 @@ export class GrpcExceptionFilter implements ExceptionFilter {
     if (error instanceof NoEncontradoError) return status.NOT_FOUND;
     if (error instanceof YaExisteError) return status.ALREADY_EXISTS;
     if (error instanceof PermisoDenegadoError) return status.PERMISSION_DENIED;
-    if (error instanceof PrecondicionFallidaError) return status.FAILED_PRECONDITION;
+    if (error instanceof PrecondicionFallidaError)
+      return status.FAILED_PRECONDITION;
     if (error instanceof ArgumentoInvalidoError) return status.INVALID_ARGUMENT;
     if (error instanceof ServicioNoDisponibleError) return status.UNAVAILABLE;
     return status.UNKNOWN;

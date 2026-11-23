@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ClientesModule } from '../clientes/clientes.module';
 import { SesionesModule } from '../sesiones/sesiones.module';
 import { Material, MaterialSchema } from './schemas/materiales.schema';
 
@@ -9,6 +10,7 @@ import { Material, MaterialSchema } from './schemas/materiales.schema';
       { name: Material.name, schema: MaterialSchema },
     ]),
     SesionesModule,
+    ClientesModule,
   ],
 })
 export class MaterialesModule {}

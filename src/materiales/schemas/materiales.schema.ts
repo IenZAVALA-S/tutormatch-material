@@ -34,7 +34,7 @@ export const ArchivoInfoSchema = SchemaFactory.createForClass(ArchivoInfo);
 
 @Schema({
   collection: 'materiales',
-  versionKey: false, 
+  versionKey: false,
   timestamps: { createdAt: 'creadoEn', updatedAt: false },
 })
 export class Material {
