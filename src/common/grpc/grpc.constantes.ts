@@ -7,6 +7,16 @@ export const GRPC_PROTO_MATERIAL = join(
   'contracts/proto/material/v1/material.proto',
 );
 
+// Contratos de los servicios a los que Material llama.
+export const GRPC_PROTO_USUARIOS = join(
+  process.cwd(),
+  'contracts/proto/usuarios/v1/usuarios.proto',
+);
+export const GRPC_PROTO_SESIONES = join(
+  process.cwd(),
+  'contracts/proto/sesiones/v1/sesiones.proto',
+);
+
 export const GRPC_TAMANO_MAXIMO_MENSAJE = 11 * 1024 * 1024;
 
 export const GRPC_OPCIONES_LOADER = {

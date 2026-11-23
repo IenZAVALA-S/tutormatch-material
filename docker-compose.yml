@@ -7,5 +7,32 @@ services:
       - "127.0.0.1:27018:27017"
     volumes:
       - mongo-data:/data/db
+
+  # Broker local para probar el consumidor sin depender del clúster del equipo.
+  # Un solo nodo en modo KRaft (sin ZooKeeper), escuchando en localhost:9092.
+  kafka:
+    image: apache/kafka:3.9.1
+    container_name: material-kafka
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9092:9092"
+    # Si se pasa cualquier KAFKA_*, la imagen ignora su configuración por
+    # defecto, así que va completa.
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      # Por defecto son 50 particiones, y en Docker sobre Windows crearlas tarda
+      # ~3 minutos la primera vez que se conecta un consumidor. Con una basta.
+      KAFKA_OFFSETS_TOPIC_NUM_PARTITIONS: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+
 volumes:
   mongo-data:
