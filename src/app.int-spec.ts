@@ -35,7 +35,7 @@ import { TOPICOS_SESION } from './sesiones/eventos-sesion.service';
  * Usuarios y Sesiones son las versiones falsas (CLIENTES_FALSOS=true).
  */
 
-const KAFKA = process.env.KAFKA_BROKERS ?? 'localhost:9092';
+const KAFKA = process.env.KAFKA_BROKERS ?? 'localhost:9192';
 
 /** Un puerto libre, para no chocar con la app de desarrollo en 9090. */
 const puertoLibre = () =>

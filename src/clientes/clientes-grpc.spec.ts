@@ -105,7 +105,9 @@ describe('Clientes gRPC reales', () => {
 
   describe('UsuariosGrpc.validarTutorRamo', () => {
     let usuarios: UsuariosGrpc;
-    beforeEach(() => (usuarios = new UsuariosGrpc(url, 300)));
+    // Plazo holgado: con la cobertura activa, la primera llamada (conectar y
+    // compilar) puede pasar de 300 ms. Solo el test del plazo usa uno corto.
+    beforeEach(() => (usuarios = new UsuariosGrpc(url, 5_000)));
     afterEach(() => usuarios.onModuleDestroy());
 
     it.each([true, false])(
@@ -122,9 +124,14 @@ describe('Clientes gRPC reales', () => {
 
     it('si Usuarios tarda más que el plazo, lo da por caído', async () => {
       respuesta = () => null;
-      await expect(usuarios.validarTutorRamo('t', 'r')).rejects.toThrow(
-        ServicioNoDisponibleError,
-      );
+      const impaciente = new UsuariosGrpc(url, 300);
+      try {
+        await expect(impaciente.validarTutorRamo('t', 'r')).rejects.toThrow(
+          ServicioNoDisponibleError,
+        );
+      } finally {
+        impaciente.onModuleDestroy();
+      }
     });
 
     it('un error inesperado de Usuarios no se disfraza de otra cosa', async () => {
@@ -138,7 +145,7 @@ describe('Clientes gRPC reales', () => {
 
   describe('SesionesGrpc.verificarParticipacion', () => {
     let sesiones: SesionesGrpc;
-    beforeEach(() => (sesiones = new SesionesGrpc(url, 300)));
+    beforeEach(() => (sesiones = new SesionesGrpc(url, 5_000)));
     afterEach(() => sesiones.onModuleDestroy());
 
     it('devuelve la participación con el tutor y el ramo', async () => {

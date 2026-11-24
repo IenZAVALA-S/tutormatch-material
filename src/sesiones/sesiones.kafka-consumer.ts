@@ -82,7 +82,7 @@ export class SesionesKafkaConsumer
     const kafka = new Kafka({
       clientId: 'material',
       brokers: this.config
-        .get<string>('KAFKA_BROKERS', 'localhost:9092')
+        .get<string>('KAFKA_BROKERS', 'localhost:9192')
         .split(','),
       // kafkajs repetiría cada error en JSON; los informamos nosotros, una vez.
       logLevel: logLevel.NOTHING,

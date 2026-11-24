@@ -18,12 +18,19 @@ const config: Config = {
     '^.+\\.(t|j)s$': 'ts-jest',
   },
   moduleNameMapper: pathsToModuleNameMapper(paths, { prefix: '<rootDir>/' }),
+  // Fuera de la cobertura: los tests de integración (si no se corren, contarían
+  // como código sin cubrir), sus utilidades y el arranque.
   collectCoverageFrom: [
-    'src/**/*.(t|j)s',
-    'libs/**/*.(t|j)s',
-    'apps/**/*.(t|j)s',
+    'src/**/*.ts',
+    '!src/**/*.int-spec.ts',
+    '!src/common/testing/**',
+    '!src/main.ts',
   ],
   coverageDirectory: './coverage',
+  // Lo exige el curso: el CI (npm run test:cov) falla bajo el 60%.
+  coverageThreshold: {
+    global: { lines: 60, statements: 60, branches: 60, functions: 60 },
+  },
   testEnvironment: 'node',
 };
 

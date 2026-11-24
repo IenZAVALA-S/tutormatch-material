@@ -203,6 +203,20 @@ describe('EvaluacionesService', () => {
       ]);
     });
 
+    it('responde 0 y 0 a un id que no es UUID, sin fallar el lote', async () => {
+      await servicio.evaluar(valida);
+
+      const resumenes = await servicio.obtenerResumenTutores([
+        'tut-e2e-278',
+        DEMO.tutorId,
+      ]);
+
+      expect(resumenes).toEqual([
+        { tutorId: 'tut-e2e-278', promedio: 0, cantidad: 0 },
+        { tutorId: DEMO.tutorId, promedio: 5, cantidad: 1 },
+      ]);
+    });
+
     it('devuelve una lista vacía si no se pide ningún tutor', async () => {
       expect(await servicio.obtenerResumenTutores([])).toEqual([]);
     });

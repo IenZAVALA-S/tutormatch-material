@@ -13,7 +13,7 @@ Las decisiones y el contrato están en el submódulo `contracts/`:
 git clone --recurse-submodules <url-de-este-repo>   # trae también contracts/
 npm install
 cp .env.example .env
-docker compose up -d                                # Mongo (localhost:27018) y Kafka (localhost:9092)
+docker compose up -d                                # Mongo (localhost:27018) y Kafka (localhost:9192)
 npm run start:dev
 ```
 
@@ -23,7 +23,7 @@ Si ya clonaste sin `--recurse-submodules`: `git submodule update --init`.
 |---|---|
 | `MONGO_URI` | Conexión a Mongo, base `material`. |
 | `GRPC_URL` | Dónde escucha gRPC (`0.0.0.0:9090`). |
-| `KAFKA_BROKERS` | Brokers de Kafka, separados por coma (`localhost:9092`). |
+| `KAFKA_BROKERS` | Brokers de Kafka, separados por coma (`localhost:9192`, el del `docker-compose`). Para probar junto a Sesiones, el de ellos (`localhost:9092`). |
 | `USUARIOS_GRPC_URL`, `SESIONES_GRPC_URL` | Servicios a los que llama Material (`usuarios:9090`, `sesiones:9090` en Kubernetes). |
 | `CLIENTES_FALSOS` | `true` para desarrollar sin Usuarios ni Sesiones: usa los datos de `src/clientes/datos-demo.ts`. Sin esta variable, las dos URL son obligatorias y la app no arranca sin ellas. |
 | `PORT` | Puerto HTTP, solo para las sondas de salud (ver Despliegue). |
@@ -33,6 +33,7 @@ Si ya clonaste sin `--recurse-submodules`: `git submodule update --init`.
 ```bash
 npm test                  # unitarios (*.spec.ts): no necesitan nada levantado
 npm run test:integracion  # *.int-spec.ts: necesitan `docker compose up -d`
+npm run test:cov          # los dos juntos, con coverage; falla bajo 60% (necesita `docker compose up -d`)
 npm run lint
 npm run format
 ```
@@ -40,6 +41,12 @@ npm run format
 Los de integración prueban las consultas reales contra Mongo (base `material_pruebas`, aparte de la de desarrollo) y, en `src/app.int-spec.ts`, la app completa de punta a punta: gRPC como el BFF, eventos en Kafka (con su propio grupo de consumidores) y GridFS.
 
 La primera corrida tarda unos minutos: en Docker sobre Windows crear cada colección e índice toma varios segundos. Después la base solo se vacía, no se borra, y las siguientes corridas son rápidas.
+
+El coverage se mide con unitarios e integración juntos: los unitarios solos no llegan al 60% en funciones, porque los repositorios y el consumidor de Kafka se prueban contra Mongo y Kafka reales.
+
+## CI
+
+`.github/workflows/ci.yml` (GitHub Actions) corre en cada push y pull request: `npm ci`, lint, build, `test:cov` con el umbral de 60% y `docker build`. Mongo y Kafka se levantan como contenedores de servicio, en los mismos puertos que el `docker-compose`. La imagen todavía no se publica.
 
 ## Estructura
 
@@ -64,7 +71,7 @@ Material consume `sesion.creada`, `sesion.finalizada` y `sesion.cancelada` (grup
 - Los tópicos los crea Sesiones. En local se pueden crear a mano:
 
 ```bash
-docker exec material-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic sesion.creada
+docker exec material-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9192 --create --topic sesion.creada
 ```
 
 ## Despliegue

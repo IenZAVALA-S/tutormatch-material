@@ -3,9 +3,12 @@ import {
   ArgumentoInvalidoError,
   PrecondicionFallidaError,
 } from '../common/errores/errores-dominio';
-import { exigirUuid } from '../common/validacion/validaciones';
+import { esUuid, exigirUuid } from '../common/validacion/validaciones';
 import { SesionesPort } from '../clientes/sesiones/sesiones.port';
-import { EvaluacionesRepository } from './evaluaciones.repository';
+import {
+  EvaluacionesRepository,
+  ResumenEvaluaciones,
+} from './evaluaciones.repository';
 import {
   COMENTARIO_MAXIMO,
   Evaluacion,
@@ -86,10 +89,15 @@ export class EvaluacionesService {
   }
 
   async obtenerResumenTutores(tutorIds: string[]): Promise<ResumenDeTutor[]> {
-    tutorIds.forEach((id) => exigirUuid(id, 'tutor_ids'));
     if (tutorIds.length === 0) return [];
 
-    const resumenes = await this.repositorio.resumenPorTutores(tutorIds);
+    // Un id que no es UUID no puede tener evaluaciones: responde 0 y 0 en vez
+    // de un error, para que un solo id malo no deje sin promedio a todo el lote.
+    const validos = tutorIds.filter(esUuid);
+    const resumenes =
+      validos.length > 0
+        ? await this.repositorio.resumenPorTutores(validos)
+        : new Map<string, ResumenEvaluaciones>();
 
     return tutorIds.map((tutorId) => ({
       tutorId,

@@ -16,7 +16,7 @@
     "lint": "oxlint --type-aware src/",
     "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js",
     "test:watch": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --watch",
-    "test:cov": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --coverage",
+    "test:cov": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --testRegex \".*\\.(int-)?spec\\.ts$\" --runInBand --testTimeout 60000 --coverage",
     "test:integracion": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --testRegex \".*\\.int-spec\\.ts$\" --runInBand --testTimeout 60000",
     "test:debug": "node --inspect-brk --experimental-vm-modules -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand"
   },
