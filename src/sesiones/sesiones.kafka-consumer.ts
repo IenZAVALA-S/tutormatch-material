@@ -29,6 +29,8 @@ export class SesionesKafkaConsumer
   private consumidor?: Consumer;
   private detenido = false;
   private conectando = false;
+  /** Para /health/listo: si el consumidor está recibiendo eventos. */
+  conectado = false;
 
   constructor(
     private readonly eventos: EventosSesionService,
@@ -87,7 +89,8 @@ export class SesionesKafkaConsumer
     });
 
     const consumidor = kafka.consumer({
-      groupId: 'material',
+      // Solo los tests usan otro grupo, para no quitarle mensajes a la app.
+      groupId: this.config.get<string>('KAFKA_GRUPO', 'material'),
       // Los tópicos los crea Sesiones; si aún no existen, se reintenta.
       allowAutoTopicCreation: false,
     });
@@ -95,7 +98,10 @@ export class SesionesKafkaConsumer
 
     // Ya conectado, kafkajs se recupera solo de casi todas las caídas. Si
     // decide no reiniciar, el consumidor quedaría muerto: se reconecta aquí.
+    consumidor.on(consumidor.events.GROUP_JOIN, () => (this.conectado = true));
+    consumidor.on(consumidor.events.DISCONNECT, () => (this.conectado = false));
     consumidor.on(consumidor.events.CRASH, ({ payload }) => {
+      this.conectado = false;
       this.logger.error(
         `El consumidor se cayó: ${payload.error.message}` +
           (payload.restart ? '; kafkajs lo reinicia' : '; se reconecta'),

@@ -10,6 +10,7 @@ import { SesionesRepository } from './sesiones.repository';
     MongooseModule.forFeature([{ name: Sesion.name, schema: SesionSchema }]),
   ],
   providers: [SesionesRepository, EventosSesionService, SesionesKafkaConsumer],
-  exports: [SesionesRepository],
+  // El consumidor se exporta solo para que /health/listo informe su estado.
+  exports: [SesionesRepository, SesionesKafkaConsumer],
 })
 export class SesionesModule {}

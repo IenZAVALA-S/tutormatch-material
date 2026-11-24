@@ -1,0 +1,11 @@
+# Lo que no entra al contexto de "docker build": más rápido y sin secretos.
+node_modules
+dist
+coverage
+.git
+contracts/.git
+.claude
+.env
+.env.*
+!.env.example
+*.log

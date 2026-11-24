@@ -26,15 +26,20 @@ Si ya clonaste sin `--recurse-submodules`: `git submodule update --init`.
 | `KAFKA_BROKERS` | Brokers de Kafka, separados por coma (`localhost:9092`). |
 | `USUARIOS_GRPC_URL`, `SESIONES_GRPC_URL` | Servicios a los que llama Material (`usuarios:9090`, `sesiones:9090` en Kubernetes). |
 | `CLIENTES_FALSOS` | `true` para desarrollar sin Usuarios ni Sesiones: usa los datos de `src/clientes/datos-demo.ts`. Sin esta variable, las dos URL son obligatorias y la app no arranca sin ellas. |
-| `PORT` | Puerto HTTP. Hoy no tiene rutas; queda para el health check de Kubernetes. |
+| `PORT` | Puerto HTTP, solo para las sondas de salud (ver Despliegue). |
 
 ## Tests
 
 ```bash
-npm test       # unitarios, no necesitan Mongo
+npm test                  # unitarios (*.spec.ts): no necesitan nada levantado
+npm run test:integracion  # *.int-spec.ts: necesitan `docker compose up -d`
 npm run lint
 npm run format
 ```
+
+Los de integración prueban las consultas reales contra Mongo (base `material_pruebas`, aparte de la de desarrollo) y, en `src/app.int-spec.ts`, la app completa de punta a punta: gRPC como el BFF, eventos en Kafka (con su propio grupo de consumidores) y GridFS.
+
+La primera corrida tarda unos minutos: en Docker sobre Windows crear cada colección e índice toma varios segundos. Después la base solo se vacía, no se borra, y las siguientes corridas son rápidas.
 
 ## Estructura
 
@@ -61,3 +66,30 @@ Material consume `sesion.creada`, `sesion.finalizada` y `sesion.cancelada` (grup
 ```bash
 docker exec material-kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --create --topic sesion.creada
 ```
+
+## Despliegue
+
+```bash
+git submodule update --init      # la imagen copia los .proto de contracts/
+docker build -t tutormatch-material .
+```
+
+La imagen escucha gRPC en `9090` y HTTP en `3002`; este último solo tiene las sondas de salud. Al recibir SIGTERM cierra ordenado: sale del grupo de Kafka y cierra Mongo.
+
+| Ruta | Para qué | Responde |
+|---|---|---|
+| `GET /health/vivo` | `livenessProbe`: si falla, Kubernetes reinicia el pod | siempre `200` mientras el proceso responda |
+| `GET /health/listo` | `readinessProbe`: si falla, no le manda tráfico | `200` con Mongo conectado; `503` sin Mongo. Kafka se informa, pero no lo deja "no listo": gRPC funciona sin él |
+
+Sondas para el Deployment:
+
+```yaml
+livenessProbe:
+  httpGet: { path: /health/vivo, port: 3002 }
+  periodSeconds: 10
+readinessProbe:
+  httpGet: { path: /health/listo, port: 3002 }
+  periodSeconds: 5
+```
+
+Variables en Kubernetes: `MONGO_URI` (en un Secret), `GRPC_URL=0.0.0.0:9090`, `PORT=3002`, `KAFKA_BROKERS`, `USUARIOS_GRPC_URL=usuarios:9090` y `SESIONES_GRPC_URL=sesiones:9090`. Sin `CLIENTES_FALSOS`.

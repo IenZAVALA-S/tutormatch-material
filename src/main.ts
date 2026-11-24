@@ -1,34 +1,19 @@
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { AppModule } from './app.module';
-import {
-  GRPC_OPCIONES_LOADER,
-  GRPC_PACKAGE_MATERIAL,
-  GRPC_PROTO_MATERIAL,
-  GRPC_TAMANO_MAXIMO_MENSAJE,
-} from './common/grpc/grpc.constantes';
+import { conectarGrpc } from './common/grpc/conectar-grpc';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  // Al recibir SIGTERM (Kubernetes apagando el pod), cierra ordenado: sale del
+  // grupo de Kafka y cierra Mongo y los clientes gRPC.
+  app.enableShutdownHooks();
   const config = app.get(ConfigService);
   const logger = new Logger('Bootstrap');
 
   const grpcUrl = config.get<string>('GRPC_URL', '0.0.0.0:9090');
-
-  app.connectMicroservice<MicroserviceOptions>({
-    transport: Transport.GRPC,
-    options: {
-      package: GRPC_PACKAGE_MATERIAL,
-      protoPath: GRPC_PROTO_MATERIAL,
-      url: grpcUrl,
-      loader: GRPC_OPCIONES_LOADER,
-      maxReceiveMessageLength: GRPC_TAMANO_MAXIMO_MENSAJE,
-      maxSendMessageLength: GRPC_TAMANO_MAXIMO_MENSAJE,
-    },
-  });
-
+  conectarGrpc(app, grpcUrl);
   await app.startAllMicroservices();
 
   const puertoHttp = config.get<number>('PORT', 3002);
