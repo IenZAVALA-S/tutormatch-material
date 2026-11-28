@@ -1,0 +1,94 @@
+# Servicio de Material. Antes de aplicar: construir la imagen (docker build -t tutormatch-material .),
+# crear el Secret material-secrets y aplicar mongo.yaml (ver README, "Kubernetes").
+# Kafka (kafka:9092), Sesiones y Usuarios se despliegan desde sus propios repos.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: material
+  labels:
+    app: material
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: material
+  template:
+    metadata:
+      labels:
+        app: material
+    spec:
+      # Usuario "node" de la imagen (uid y gid 1000).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+      containers:
+        - name: material
+          # Imagen construida en el equipo; el Kubernetes de Docker Desktop la usa sin registro.
+          image: tutormatch-material:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: grpc
+              containerPort: 9090
+            - name: http
+              containerPort: 3002
+          env:
+            - name: GRPC_URL
+              value: 0.0.0.0:9090
+            - name: PORT
+              value: "3002"
+            - name: KAFKA_BROKERS
+              value: kafka:9092
+            - name: USUARIOS_GRPC_URL
+              value: usuarios:9090
+            - name: SESIONES_GRPC_URL
+              value: sesiones:9090
+            - name: MONGO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: material-secrets
+                  key: mongo-password
+            # Kubernetes reemplaza $(MONGO_PASSWORD) por la variable de arriba. authSource=admin porque el
+            # usuario lo crea MONGO_INITDB_ROOT_USERNAME en la base admin.
+            - name: MONGO_URI
+              value: mongodb://material:$(MONGO_PASSWORD)@material-mongo:27017/material?authSource=admin
+          livenessProbe:
+            httpGet:
+              path: /health/vivo
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          # 503 mientras Mongo no esté conectado: no recibe tráfico hasta entonces.
+          readinessProbe:
+            httpGet:
+              path: /health/listo
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            # Los archivos llegan hasta 10 MB y viajan enteros en un mensaje gRPC.
+            limits:
+              cpu: 500m
+              memory: 384Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: material
+  labels:
+    app: material
+spec:
+  type: ClusterIP
+  selector:
+    app: material
+  ports:
+    - name: grpc
+      port: 9090
+      targetPort: 9090

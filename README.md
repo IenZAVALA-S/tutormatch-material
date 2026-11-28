@@ -88,15 +88,47 @@ La imagen escucha gRPC en `9090` y HTTP en `3002`; este último solo tiene las s
 | `GET /health/vivo` | `livenessProbe`: si falla, Kubernetes reinicia el pod | siempre `200` mientras el proceso responda |
 | `GET /health/listo` | `readinessProbe`: si falla, no le manda tráfico | `200` con Mongo conectado; `503` sin Mongo. Kafka se informa, pero no lo deja "no listo": gRPC funciona sin él |
 
-Sondas para el Deployment:
+## Kubernetes
 
-```yaml
-livenessProbe:
-  httpGet: { path: /health/vivo, port: 3002 }
-  periodSeconds: 10
-readinessProbe:
-  httpGet: { path: /health/listo, port: 3002 }
-  periodSeconds: 5
-```
+Los manifiestos están en `k8s/` y siguen las convenciones del equipo: YAML simple, namespace por defecto, imagen construida en el equipo (sin registro) y Services `ClusterIP` con el nombre del servicio. Se probaron en el Kubernetes de Docker Desktop, con Kafka, Sesiones y el BFF del equipo en el mismo cluster.
 
-Variables en Kubernetes: `MONGO_URI` (en un Secret), `GRPC_URL=0.0.0.0:9090`, `PORT=3002`, `KAFKA_BROKERS`, `USUARIOS_GRPC_URL=usuarios:9090` y `SESIONES_GRPC_URL=sesiones:9090`. Sin `CLIENTES_FALSOS`.
+| Archivo | Qué crea |
+|---|---|
+| `k8s/mongo.yaml` | Mongo 7 propio (`material-mongo:27017`) con un volumen de 1 GiB y el usuario `material` |
+| `k8s/material.yaml` | El servicio (`material:9090`, gRPC), con las sondas en `/health/vivo` y `/health/listo` del puerto 3002 |
+
+Variables del Deployment: `GRPC_URL=0.0.0.0:9090`, `PORT=3002`, `KAFKA_BROKERS=kafka:9092`, `USUARIOS_GRPC_URL=usuarios:9090`, `SESIONES_GRPC_URL=sesiones:9090` y `MONGO_URI`, armada con la contraseña del Secret. Sin `CLIENTES_FALSOS`.
+
+Kafka, Sesiones y Usuarios no están aquí: Kafka y Sesiones se despliegan desde el repo de Sesiones (`k8s/kafka.yaml`) y Usuarios desde el suyo. Material arranca aunque falten: el consumidor de Kafka reintenta cada 5 s, y las llamadas a Usuarios o Sesiones fallan hasta que estén.
+
+1. Activar Kubernetes en Docker Desktop (Settings → Kubernetes) y revisar que `kubectl config current-context` diga `docker-desktop`.
+2. Construir la imagen, con el submódulo descargado:
+
+   ```bash
+   git submodule update --init
+   docker build -t tutormatch-material .
+   ```
+
+3. Crear el Secret con la contraseña de Mongo, solo con letras y números porque va dentro de `MONGO_URI`. No se versiona:
+
+   ```bash
+   kubectl create secret generic material-secrets --from-literal=mongo-password=<contraseña>
+   ```
+
+4. Aplicar Mongo y después el servicio:
+
+   ```bash
+   kubectl apply -f k8s/mongo.yaml
+   kubectl apply -f k8s/material.yaml
+   ```
+
+5. Revisar:
+
+   ```bash
+   kubectl get pods -l 'app in (material, material-mongo)'   # los dos en Running y READY 1/1
+   kubectl logs deploy/material                               # Mongo conectado y el consumidor de Kafka suscrito
+   ```
+
+Para actualizar después de un cambio: reconstruir la imagen y `kubectl rollout restart deploy/material`.
+
+La contraseña de Mongo se fija la primera vez que arranca con el volumen vacío. Si se cambia el Secret después, Mongo sigue con la anterior: hay que borrar el volumen (`kubectl delete -f k8s/mongo.yaml`, que también borra el PVC y los datos) y volver a aplicar.

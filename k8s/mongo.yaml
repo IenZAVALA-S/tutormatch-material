@@ -1,0 +1,100 @@
+# Base de datos propia de Material (Mongo 7, como en docker-compose.yml).
+# Las colecciones y los índices los crea Material al arrancar, así que no hay script de inicio.
+# La contraseña del usuario "material" sale del Secret material-secrets (ver README, "Kubernetes").
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: material-mongo-data
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: material-mongo
+  labels:
+    app: material-mongo
+spec:
+  replicas: 1
+  # El volumen es ReadWriteOnce: el pod viejo debe terminar antes de que arranque el nuevo.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: material-mongo
+  template:
+    metadata:
+      labels:
+        app: material-mongo
+    spec:
+      # Usuario "mongodb" de la imagen oficial (uid y gid 999).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+      containers:
+        - name: mongo
+          image: mongo:7
+          imagePullPolicy: IfNotPresent
+          # Por defecto Mongo reserva para su caché la mitad de la memoria que ve; con el límite
+          # del contenedor eso puede terminar en OOMKilled.
+          args: ["--wiredTigerCacheSizeGB", "0.25"]
+          ports:
+            - name: mongo
+              containerPort: 27017
+          env:
+            # Usuario administrador que crea la imagen la primera vez que arranca con el volumen vacío.
+            - name: MONGO_INITDB_ROOT_USERNAME
+              value: material
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: material-secrets
+                  key: mongo-password
+          volumeMounts:
+            - name: datos
+              mountPath: /data/db
+          # ping no necesita autenticarse.
+          readinessProbe:
+            exec:
+              command: ["mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: mongo
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: datos
+          persistentVolumeClaim:
+            claimName: material-mongo-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: material-mongo
+spec:
+  type: ClusterIP
+  selector:
+    app: material-mongo
+  ports:
+    - name: mongo
+      port: 27017
+      targetPort: 27017
